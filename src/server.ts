@@ -127,6 +127,16 @@ io.on('connection', (socket) => {
     handleUserLeave(socket, data.roomId);
   });
 
+  socket.on("select_map", (data) => {
+    const { roomId, mapId } = data;
+    const room = roomService.getRoom(roomId);
+    if (room) {
+      room.mapId = mapId;
+    }
+    // Broadcast the map selection to all members in the room
+    io.to(roomId).emit("select_map", { mapId });
+  });
+
   // 4. Disconnect
   socket.on('disconnect', (reason) => {
     console.log(`[Socket Disconnected] ID: ${socket.id}, reason: ${reason}`);
