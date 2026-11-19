@@ -52,6 +52,7 @@ export interface ServerToClientEvents {
   room_joined: (room: Room) => void;
   user_joined: (data: { member: RoomMember; membersCount: number }) => void;
   user_left: (data: { memberId: string; memberName: string; membersCount: number }) => void;
+  host_changed: (data: { newHostId: string }) => void;
   error_message: (message: string) => void;
   select_map: (data: { mapId: string }) => void;
 }

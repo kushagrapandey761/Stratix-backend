@@ -151,6 +151,7 @@ io.on('connection', (socket) => {
  * Common handler for a socket leaving a room
  */
 function handleUserLeave(socket: any, roomId: string) {
+  const previousHostId = roomService.getRoom(roomId)?.hostId;
   const { room, removedMember, roomDeleted } = roomService.removeUserFromRoom(roomId, socket.id);
   socket.leave(roomId);
   socket.data.currentRoomId = undefined;
@@ -162,6 +163,9 @@ function handleUserLeave(socket: any, roomId: string) {
       memberName: removedMember.name,
       membersCount: room.members.length,
     });
+    if (room.hostId !== previousHostId) {
+      io.to(roomId).emit('host_changed', { newHostId: room.hostId });
+    }
   } else if (roomDeleted) {
     console.log(`[Room Deleted] Room ${roomId} was closed (all members left).`);
   }
