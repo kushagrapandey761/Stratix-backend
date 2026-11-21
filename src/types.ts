@@ -45,6 +45,8 @@ export interface ClientToServerEvents {
 
   leave_room: (data: { roomId: string }) => void;
   select_map: (data: { roomId: string; mapId: string }) => void;
+  cursor_move: (data: { roomId: string; x: number; y: number }) => void;
+  cursor_leave: (data: { roomId: string }) => void;
 }
 
 // Server -> Client Events
@@ -55,6 +57,8 @@ export interface ServerToClientEvents {
   host_changed: (data: { newHostId: string }) => void;
   error_message: (message: string) => void;
   select_map: (data: { mapId: string }) => void;
+  cursor_move: (data: { userId: string; userName: string; color: string; x: number; y: number }) => void;
+  cursor_leave: (data: { userId: string }) => void;
 }
 
 export interface SocketData {

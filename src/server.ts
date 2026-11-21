@@ -137,7 +137,31 @@ io.on('connection', (socket) => {
     io.to(roomId).emit("select_map", { mapId });
   });
 
-  // 4. Disconnect
+  // 4. Real-time Cursors
+  socket.on('cursor_move', (data) => {
+    const { roomId, x, y } = data;
+    const room = roomService.getRoom(roomId);
+    if (!room) return;
+
+    const member = room.members.find((m) => m.id === socket.id);
+    const color = member?.color || '#00F0FF';
+    const userName = member?.name || socket.data.userName || 'Operator';
+
+    // Broadcast cursor position exclusively to other room members
+    socket.to(roomId).emit('cursor_move', {
+      userId: socket.id,
+      userName,
+      color,
+      x,
+      y,
+    });
+  });
+
+  socket.on('cursor_leave', (data) => {
+    socket.to(data.roomId).emit('cursor_leave', { userId: socket.id });
+  });
+
+  // 5. Disconnect
   socket.on('disconnect', (reason) => {
     console.log(`[Socket Disconnected] ID: ${socket.id}, reason: ${reason}`);
     const { roomId } = roomService.findUserRoom(socket.id);
@@ -155,6 +179,9 @@ function handleUserLeave(socket: any, roomId: string) {
   const { room, removedMember, roomDeleted } = roomService.removeUserFromRoom(roomId, socket.id);
   socket.leave(roomId);
   socket.data.currentRoomId = undefined;
+
+  // Inform clients to remove this user's cursor
+  io.to(roomId).emit('cursor_leave', { userId: socket.id });
 
   if (removedMember && !roomDeleted && room) {
     console.log(`[User Left] ${removedMember.name} left room ${roomId}`);
