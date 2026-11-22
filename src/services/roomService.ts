@@ -1,4 +1,4 @@
-import { Room, RoomMember, RoomVisibility } from '../types.js';
+import { CanvasElement, Room, RoomMember, RoomVisibility } from '../types.js';
 
 // Tactical colors assigned to members in order
 const TACTICAL_COLORS = [
@@ -89,6 +89,7 @@ export class RoomService {
       createdAt: Date.now(),
       hostId: params.hostId,
       members: [hostMember],
+      elements: [],
     };
 
     this.rooms.set(roomId, newRoom);
@@ -144,6 +145,52 @@ export class RoomService {
    */
   public getRoom(roomId: string): Room | undefined {
     return this.rooms.get(roomId.toUpperCase());
+  }
+
+  /**
+   * Add or update an element in the room's persistent canvas state
+   */
+  public addElement(roomId: string, element: CanvasElement): boolean {
+    const room = this.getRoom(roomId);
+    if (!room) return false;
+    if (!room.elements) room.elements = [];
+    const index = room.elements.findIndex((e) => e.id === element.id);
+    if (index >= 0) {
+      room.elements[index] = element;
+    } else {
+      room.elements.push(element);
+    }
+    return true;
+  }
+
+  /**
+   * Delete an element by ID
+   */
+  public removeElement(roomId: string, elementId: string): boolean {
+    const room = this.getRoom(roomId);
+    if (!room || !room.elements) return false;
+    room.elements = room.elements.filter((e) => e.id !== elementId);
+    return true;
+  }
+
+  /**
+   * Clear all elements from the room canvas
+   */
+  public clearElements(roomId: string): boolean {
+    const room = this.getRoom(roomId);
+    if (!room) return false;
+    room.elements = [];
+    return true;
+  }
+
+  /**
+   * Replace the room canvas with a synchronized undo/redo state
+   */
+  public replaceElements(roomId: string, elements: CanvasElement[]): boolean {
+    const room = this.getRoom(roomId);
+    if (!room) return false;
+    room.elements = elements;
+    return true;
   }
 
   /**

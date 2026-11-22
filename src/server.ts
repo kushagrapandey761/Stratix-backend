@@ -55,6 +55,8 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, object, Socket
 // Socket.IO event orchestration
 io.on('connection', (socket) => {
   console.log(`[Socket Connected] ID: ${socket.id}`);
+  const isRoomMember = (roomId: string) =>
+    roomService.getRoom(roomId)?.members.some((member) => member.id === socket.id) ?? false;
 
   // 1. Create Room
   socket.on('create_room', (data, callback) => {
@@ -161,7 +163,43 @@ io.on('connection', (socket) => {
     socket.to(data.roomId).emit('cursor_leave', { userId: socket.id });
   });
 
-  // 5. Disconnect
+  // 5. Real-time Collaborative Whiteboard (activeElement & drawings)
+  socket.on('drawing_live', (data) => {
+    if (!isRoomMember(data.roomId)) return;
+    // Broadcast active in-progress drawing preview to all other room operators
+    socket.to(data.roomId).emit('drawing_live', {
+      userId: socket.id,
+      element: data.element,
+    });
+  });
+
+  socket.on('element_commit', (data) => {
+    if (!isRoomMember(data.roomId) || !roomService.addElement(data.roomId, data.element)) return;
+    // Broadcast finalized element to all other room operators
+    socket.to(data.roomId).emit('element_commit', {
+      userId: socket.id,
+      element: data.element,
+    });
+  });
+
+  socket.on('element_delete', (data) => {
+    if (!isRoomMember(data.roomId) || !roomService.removeElement(data.roomId, data.elementId)) return;
+    socket.to(data.roomId).emit('element_delete', {
+      elementId: data.elementId,
+    });
+  });
+
+  socket.on('canvas_clear', (data) => {
+    if (!isRoomMember(data.roomId) || !roomService.clearElements(data.roomId)) return;
+    socket.to(data.roomId).emit('canvas_clear');
+  });
+
+  socket.on('canvas_sync', (data) => {
+    if (!isRoomMember(data.roomId) || !roomService.replaceElements(data.roomId, data.elements)) return;
+    socket.to(data.roomId).emit('canvas_sync', { elements: data.elements });
+  });
+
+  // 6. Disconnect
   socket.on('disconnect', (reason) => {
     console.log(`[Socket Disconnected] ID: ${socket.id}, reason: ${reason}`);
     const { roomId } = roomService.findUserRoom(socket.id);
@@ -180,8 +218,9 @@ function handleUserLeave(socket: any, roomId: string) {
   socket.leave(roomId);
   socket.data.currentRoomId = undefined;
 
-  // Inform clients to remove this user's cursor
+  // Inform clients to remove this user's cursor & any in-progress drawing
   io.to(roomId).emit('cursor_leave', { userId: socket.id });
+  io.to(roomId).emit('drawing_live', { userId: socket.id, element: null });
 
   if (removedMember && !roomDeleted && room) {
     console.log(`[User Left] ${removedMember.name} left room ${roomId}`);
