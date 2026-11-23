@@ -98,6 +98,10 @@ export interface ClientToServerEvents {
   element_delete: (data: { roomId: string; elementId: string }) => void;
   canvas_clear: (data: { roomId: string }) => void;
   canvas_sync: (data: { roomId: string; elements: CanvasElement[] }) => void;
+
+  // WebRTC Voice Signaling & Status
+  webrtc_signal: (data: { to: string; signal: any }) => void;
+  voice_status: (data: { roomId: string; isMuted: boolean; isSpeaking: boolean }) => void;
 }
 
 // Server -> Client Events
@@ -117,6 +121,10 @@ export interface ServerToClientEvents {
   element_delete: (data: { elementId: string }) => void;
   canvas_clear: () => void;
   canvas_sync: (data: { elements: CanvasElement[] }) => void;
+
+  // WebRTC Voice Signaling & Status
+  webrtc_signal: (data: { from: string; signal: any }) => void;
+  voice_status: (data: { userId: string; isMuted: boolean; isSpeaking: boolean }) => void;
 }
 
 export interface SocketData {

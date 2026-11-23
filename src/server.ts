@@ -199,7 +199,25 @@ io.on('connection', (socket) => {
     socket.to(data.roomId).emit('canvas_sync', { elements: data.elements });
   });
 
-  // 6. Disconnect
+  // 6. WebRTC Voice Signaling & Status Relay
+  socket.on('webrtc_signal', (data) => {
+    // Relay signaling payload (SDP offer/answer or ICE candidate) directly to the target peer
+    io.to(data.to).emit('webrtc_signal', {
+      from: socket.id,
+      signal: data.signal,
+    });
+  });
+
+  socket.on('voice_status', (data) => {
+    // Broadcast user's mute/speaking status to everyone else in the room
+    socket.to(data.roomId).emit('voice_status', {
+      userId: socket.id,
+      isMuted: data.isMuted,
+      isSpeaking: data.isSpeaking,
+    });
+  });
+
+  // 7. Disconnect
   socket.on('disconnect', (reason) => {
     console.log(`[Socket Disconnected] ID: ${socket.id}, reason: ${reason}`);
     const { roomId } = roomService.findUserRoom(socket.id);
