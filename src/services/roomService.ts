@@ -147,6 +147,30 @@ export class RoomService {
     return this.rooms.get(roomId.toUpperCase());
   }
 
+  public updateMemberAgent(
+    roomId: string,
+    userId: string,
+    agentId: string | null
+  ): { success: boolean; error?: string } {
+    const room = this.getRoom(roomId);
+    if (!room) return { success: false, error: 'Room not found.' };
+
+    const member = room.members.find((roomMember) => roomMember.id === userId);
+    if (!member) return { success: false, error: 'You must be in the room to select an agent.' };
+
+    if (agentId && room.members.some((roomMember) => roomMember.id !== userId && roomMember.agent === agentId)) {
+      return { success: false, error: 'That agent has already been selected by another operator.' };
+    }
+
+    if (agentId === null) {
+      delete member.agent;
+    } else {
+      member.agent = agentId;
+    }
+
+    return { success: true };
+  }
+
   /**
    * Add or update an element in the room's persistent canvas state
    */

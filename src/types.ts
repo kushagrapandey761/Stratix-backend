@@ -3,7 +3,7 @@ export type RoomVisibility = 'public' | 'private';
 export interface RoomMember {
   id: string; // Socket ID or permanent User ID
   name: string;
-  agent?: string; // e.g. "Omen", "Jett"
+  agent?: string; // Valorant agent UUID
   role: 'leader' | 'strategist' | 'member';
   color: string; // Tactical cursor / ping color
   joinedAt: number;
@@ -39,6 +39,8 @@ export interface PingElement extends BaseCanvasElement {
   x: number;
   y: number;
   label?: string;
+  imageUrl?: string;
+  ownerId?: string;
   pingType?: 'danger' | 'move' | 'utility' | 'warning' | 'info';
 }
 
@@ -89,6 +91,16 @@ export interface ClientToServerEvents {
 
   leave_room: (data: { roomId: string }) => void;
   select_map: (data: { roomId: string; mapId: string }) => void;
+  select_agent: (
+    data: {
+      roomId: string;
+      agentId: string | null;
+      agentIcon: string | null;
+      x: number;
+      y: number;
+    },
+    callback: (response: { success: boolean; error?: string }) => void
+  ) => void;
   cursor_move: (data: { roomId: string; x: number; y: number }) => void;
   cursor_leave: (data: { roomId: string }) => void;
 
@@ -112,6 +124,7 @@ export interface ServerToClientEvents {
   host_changed: (data: { newHostId: string }) => void;
   error_message: (message: string) => void;
   select_map: (data: { mapId: string }) => void;
+  select_agent: (data: { userId: string; agentId: string | null }) => void;
   cursor_move: (data: { userId: string; userName: string; color: string; x: number; y: number }) => void;
   cursor_leave: (data: { userId: string }) => void;
 

@@ -139,6 +139,70 @@ io.on('connection', (socket) => {
     io.to(roomId).emit("select_map", { mapId });
   });
 
+  socket.on('select_agent', (data, callback) => {
+    const respond = (response: { success: boolean; error?: string }) => callback?.(response);
+    if (
+      !data ||
+      typeof data.roomId !== 'string' ||
+      (data.agentId !== null &&
+        (typeof data.agentId !== 'string' ||
+          data.agentId.trim().length === 0 ||
+          data.agentId.length > 64 ||
+          !Number.isFinite(data.x) ||
+          !Number.isFinite(data.y) ||
+          data.x < 0 ||
+          data.x > 1000 ||
+          data.y < 0 ||
+          data.y > 1000 ||
+          !isValorantAgentIcon(data.agentIcon)))
+    ) {
+      respond({ success: false, error: 'Invalid agent selection.' });
+      return;
+    }
+
+    const roomId = data.roomId.trim().toUpperCase();
+    const agentId = typeof data.agentId === 'string' ? data.agentId.trim() : null;
+    if (!isRoomMember(roomId)) {
+      respond({ success: false, error: 'You must be in the room to select an agent.' });
+      return;
+    }
+
+    const result = roomService.updateMemberAgent(roomId, socket.id, agentId);
+    if (!result.success) {
+      respond(result);
+      return;
+    }
+
+    io.to(roomId).emit('select_agent', { userId: socket.id, agentId });
+    const agentMarkerId = `agent-${socket.id}`;
+    if (agentId === null) {
+      roomService.removeElement(roomId, agentMarkerId);
+      io.to(roomId).emit('element_delete', { elementId: agentMarkerId });
+    } else {
+      const room = roomService.getRoom(roomId);
+      const member = room?.members.find((roomMember) => roomMember.id === socket.id);
+      if (!room || !member || !data.agentIcon) {
+        respond({ success: false, error: 'Unable to create the agent marker.' });
+        return;
+      }
+
+      const agentMarker = {
+        id: agentMarkerId,
+        type: 'ping' as const,
+        color: member.color,
+        strokeWidth: 2,
+        x: data.x,
+        y: data.y,
+        label: member.name,
+        imageUrl: data.agentIcon,
+        ownerId: socket.id,
+      };
+      roomService.addElement(roomId, agentMarker);
+      io.to(roomId).emit('element_commit', { userId: socket.id, element: agentMarker });
+    }
+    respond({ success: true });
+  });
+
   // 4. Real-time Cursors
   socket.on('cursor_move', (data) => {
     const { roomId, x, y } = data;
@@ -227,6 +291,21 @@ io.on('connection', (socket) => {
   });
 });
 
+function isValorantAgentIcon(iconUrl: string | null): boolean {
+  if (!iconUrl) return false;
+
+  try {
+    const url = new URL(iconUrl);
+    return (
+      url.protocol === 'https:' &&
+      url.hostname === 'media.valorant-api.com' &&
+      /^\/agents\/[^/]+\/[^/]+$/i.test(url.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Common handler for a socket leaving a room
  */
@@ -235,6 +314,12 @@ function handleUserLeave(socket: any, roomId: string) {
   const { room, removedMember, roomDeleted } = roomService.removeUserFromRoom(roomId, socket.id);
   socket.leave(roomId);
   socket.data.currentRoomId = undefined;
+
+  const agentMarkerId = `agent-${socket.id}`;
+  if (room && !roomDeleted && room.elements.some((element) => element.id === agentMarkerId)) {
+    roomService.removeElement(roomId, agentMarkerId);
+    io.to(roomId).emit('element_delete', { elementId: agentMarkerId });
+  }
 
   // Inform clients to remove this user's cursor & any in-progress drawing
   io.to(roomId).emit('cursor_leave', { userId: socket.id });
