@@ -28,6 +28,11 @@ app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', service: 'stratix-backend' });
 });
 
+// Public room directory (returns summaries only, never private room data)
+app.get('/api/rooms/public', (_req: Request, res: Response) => {
+  return res.status(200).json({ rooms: roomService.getPublicRooms() });
+});
+
 // REST endpoint to inspect room status (useful for debugging)
 app.get('/api/rooms/:roomId', (req: Request, res: Response) => {
   const room = roomService.getRoom(req.params.roomId);
@@ -52,11 +57,19 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents, object, Socket
   }
 );
 
+function broadcastPublicRooms() {
+  io.emit('public_rooms_updated', roomService.getPublicRooms());
+}
+
 // Socket.IO event orchestration
 io.on('connection', (socket) => {
   console.log(`[Socket Connected] ID: ${socket.id}`);
   const isRoomMember = (roomId: string) =>
     roomService.getRoom(roomId)?.members.some((member) => member.id === socket.id) ?? false;
+
+  socket.on('get_public_rooms', (callback) => {
+    callback({ rooms: roomService.getPublicRooms() });
+  });
 
   // 1. Create Room
   socket.on('create_room', (data, callback) => {
@@ -82,6 +95,7 @@ io.on('connection', (socket) => {
 
       console.log(`[Room Created] ${result.room.id} by ${data.userName} (${socket.id})`);
       callback({ success: true, room: result.room });
+      broadcastPublicRooms();
     } catch (err) {
       console.error('[create_room error]', err);
       callback({ success: false, error: 'Internal server error while creating room.' });
@@ -118,6 +132,7 @@ io.on('connection', (socket) => {
 
       // Confirm to the caller
       callback({ success: true, room: result.room });
+      broadcastPublicRooms();
     } catch (err) {
       console.error('[join_room error]', err);
       callback({ success: false, error: 'Internal server error while joining room.' });
@@ -134,6 +149,7 @@ io.on('connection', (socket) => {
     const room = roomService.getRoom(roomId);
     if (room) {
       room.mapId = mapId;
+      broadcastPublicRooms();
     }
     // Broadcast the map selection to all members in the room
     io.to(roomId).emit("select_map", { mapId });
@@ -338,6 +354,8 @@ function handleUserLeave(socket: any, roomId: string) {
   } else if (roomDeleted) {
     console.log(`[Room Deleted] Room ${roomId} was closed (all members left).`);
   }
+
+  broadcastPublicRooms();
 }
 
 // Start Server

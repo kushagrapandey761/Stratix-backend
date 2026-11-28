@@ -1,4 +1,4 @@
-import { CanvasElement, Room, RoomMember, RoomVisibility } from '../types.js';
+import { CanvasElement, PublicRoomSummary, Room, RoomMember, RoomVisibility } from '../types.js';
 
 // Tactical colors assigned to members in order
 const TACTICAL_COLORS = [
@@ -83,7 +83,7 @@ export class RoomService {
       id: roomId,
       name: params.name.trim(),
       description: params.description?.trim(),
-      mapId: params.mapId,
+      mapId: params.mapId?.trim() || 'ascent',
       visibility: params.visibility || 'private',
       maxParticipants: Math.min(Math.max(params.maxParticipants || 5, 2), 10),
       createdAt: Date.now(),
@@ -145,6 +145,20 @@ export class RoomService {
    */
   public getRoom(roomId: string): Room | undefined {
     return this.rooms.get(roomId.toUpperCase());
+  }
+
+  public getPublicRooms(): PublicRoomSummary[] {
+    return Array.from(this.rooms.values())
+      .filter((room) => room.visibility === 'public' && room.members.length > 0)
+      .map(({ id, name, description, mapId, maxParticipants, createdAt, members }) => ({
+        id,
+        name,
+        description,
+        mapId,
+        maxParticipants,
+        createdAt,
+        memberCount: members.length,
+      }));
   }
 
   public updateMemberAgent(
